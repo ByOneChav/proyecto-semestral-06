@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: backend-despacho
+
+  # namespace del proyecto
+  namespace: innovatech
+
+spec:
+
+  selector:
+    app: backend-despacho
+
+  ports:
+
+  # puerto externo
+  - port: 80
+
+    # puerto contenedor
+    targetPort: 8081
+
+  type: ClusterIP

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: frontend
+
+  # namespace del proyecto
+  namespace: innovatech
+
+spec:
+
+  # replicas iniciales
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      labels:
+        app: frontend
+
+    spec:
+      containers:
+
+      - name: frontend
+
+        # imagen ECR
+        image: 694766583274.dkr.ecr.us-east-1.amazonaws.com/frontend-despacho:latest
+
+        imagePullPolicy: Always
+
+        ports:
+
+        # puerto nginx
+        - containerPort: 80

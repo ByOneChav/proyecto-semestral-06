@@ -1,0 +1,269 @@
+name: CI/CD Innovatech EKS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+env:
+  # Nombres de los repositorios ECR (no son secretos)
+  ECR_REPO_VENTAS: backend-ventas
+  ECR_REPO_DESPACHO: backend-despacho
+  ECR_REPO_FRONTEND: frontend-despacho
+
+
+jobs:
+  # ────────────────────────────────────────────────────────
+  # JOB 1 — Build y push Backend Ventas (puerto 8080)
+  # ────────────────────────────────────────────────────────
+  build-backend-ventas:
+    name: Build Backend Ventas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Definir tag de imagen
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build & push Backend Ventas
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPO_VENTAS:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPO_VENTAS:latest \
+            ./back-Ventas_SpringBoot/Springboot-API-REST
+          docker push $ECR_REGISTRY/$ECR_REPO_VENTAS:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO_VENTAS:latest
+
+
+  # ────────────────────────────────────────────────────────
+  # JOB 2 — Build y push Backend Despacho (puerto 8081)
+  # ────────────────────────────────────────────────────────
+  build-backend-despacho:
+    name: Build Backend Despacho
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Definir tag de imagen
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build & push Backend Despacho
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPO_DESPACHO:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPO_DESPACHO:latest \
+            ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+          docker push $ECR_REGISTRY/$ECR_REPO_DESPACHO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO_DESPACHO:latest
+
+
+  # ────────────────────────────────────────────────────────
+  # JOB 3 — Build y push Frontend React + Vite
+  # ────────────────────────────────────────────────────────
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Definir tag de imagen
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build & push Frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPO_FRONTEND:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest \
+            ./front_despacho
+          docker push $ECR_REGISTRY/$ECR_REPO_FRONTEND:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest
+
+
+  # ────────────────────────────────────────────────────────
+  # JOB 4 — Deploy a EKS (espera los 3 builds)
+  # ────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy a EKS
+    runs-on: ubuntu-latest
+    needs:
+      - build-backend-ventas
+      - build-backend-despacho
+      - build-frontend
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Definir tag de imagen
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Instalar kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.29.0
+
+      - name: Configurar kubeconfig para EKS
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
+          kubectl config current-context
+
+      # ── Namespace ──────────────────────────────────────
+      - name: Aplicar namespace
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+
+      # ── MySQL y secreto de BD ──────────────────────────
+      - name: Aplicar MySQL y secreto de BD
+        env:
+          EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE }}
+        run: |
+          kubectl apply -f k8s/rds-secret.yaml -n $EKS_NAMESPACE
+          kubectl apply -f k8s/mysql.yaml -n $EKS_NAMESPACE
+
+      - name: Esperar a que MySQL esté listo
+        env:
+          EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE }}
+        run: |
+          kubectl rollout status deployment/mysql \
+            -n $EKS_NAMESPACE --timeout=300s
+
+      # ── Backend Ventas ─────────────────────────────────
+      - name: Actualizar Backend Ventas en EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE }}
+        run: |
+          kubectl apply -f k8s/backend-ventas-deployment.yaml -n $EKS_NAMESPACE
+          kubectl apply -f k8s/backend-ventas-service.yaml    -n $EKS_NAMESPACE
+          kubectl apply -f k8s/backend-ventas-hpa.yaml        -n $EKS_NAMESPACE
+          kubectl set image deployment/backend-ventas \
+            backend-ventas=$ECR_REGISTRY/$ECR_REPO_VENTAS:$IMAGE_TAG \
+            -n $EKS_NAMESPACE
+          kubectl rollout status deployment/backend-ventas \
+            -n $EKS_NAMESPACE --timeout=180s
+
+      # ── Backend Despacho ───────────────────────────────
+      - name: Actualizar Backend Despacho en EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE }}
+        run: |
+          kubectl apply -f k8s/backend-despacho-deployment.yaml -n $EKS_NAMESPACE
+          kubectl apply -f k8s/backend-despacho-service.yaml    -n $EKS_NAMESPACE
+          kubectl apply -f k8s/backend-despacho-hpa.yaml        -n $EKS_NAMESPACE
+          kubectl set image deployment/backend-despacho \
+            backend-despacho=$ECR_REGISTRY/$ECR_REPO_DESPACHO:$IMAGE_TAG \
+            -n $EKS_NAMESPACE
+          kubectl rollout status deployment/backend-despacho \
+            -n $EKS_NAMESPACE --timeout=180s
+
+      # ── Frontend ───────────────────────────────────────
+      - name: Actualizar Frontend en EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE }}
+        run: |
+          kubectl apply -f k8s/frontend-deployment.yaml -n $EKS_NAMESPACE
+          kubectl apply -f k8s/frontend-service.yaml    -n $EKS_NAMESPACE
+          kubectl apply -f k8s/frontend-hpa.yaml        -n $EKS_NAMESPACE
+          kubectl set image deployment/frontend \
+            frontend=$ECR_REGISTRY/$ECR_REPO_FRONTEND:$IMAGE_TAG \
+            -n $EKS_NAMESPACE
+          kubectl rollout status deployment/frontend \
+            -n $EKS_NAMESPACE --timeout=180s
+
+      # ── Estado final ───────────────────────────────────
+      - name: Ver pods y servicios
+        env:
+          EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE }}
+        run: |
+          echo "===== PODS ====="
+          kubectl get pods -n $EKS_NAMESPACE
+
+          echo "===== SERVICIOS ====="
+          kubectl get svc -n $EKS_NAMESPACE
+
+          echo "===== HPA ====="
+          kubectl get hpa -n $EKS_NAMESPACE || true
+
+          echo "===== URL pública del frontend ====="
+          kubectl get svc frontend -n $EKS_NAMESPACE \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+          echo ""
