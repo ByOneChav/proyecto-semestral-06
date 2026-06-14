@@ -8,8 +8,14 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+  sql:
+    init:
+      mode: always
+
   jpa:
     database: mysql
+    defer-datasource-initialization: true
     hibernate:
       ddl-auto: update
     properties:
