@@ -1,8 +1,3 @@
--- ============================================
--- DATOS INICIALES - Backend Ventas
--- Ubicación: back-Ventas_SpringBoot/Springboot-API-REST/src/main/resources/data.sql
--- ============================================
-
 INSERT INTO venta (direccion_compra, valor_compra, fecha_compra, despacho_generado) VALUES
 ('Av. Providencia 1234, Santiago',        85000,  '2024-01-15', true),
 ('Calle Larga 567, Valparaíso',           120000, '2024-01-18', true),
